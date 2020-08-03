@@ -50,7 +50,7 @@ class PCAE(nn.Module):
             noise_1 = torch.FloatTensor(*part_capsule_param.size()[:2]).uniform_(-2, 2).to(device)
         else:
             noise_1 = torch.zeros(*part_capsule_param.size()[:2]).to(device)
-        # [B, 24, 6], [B, 24, 1], [B, 24, 16]
+        # [B, 24, 6], [B, 24, 1], [B, 24, 16]. pose, presence prob, feature
         x_m, d_m, c_z = self.relu(part_capsule_param[:, :, :6]), self.sigmoid(
             part_capsule_param[:, :, 6] + noise_1).view(*part_capsule_param.size()[:2], 1), self.relu(
             part_capsule_param[:, :, 7:])
@@ -58,7 +58,7 @@ class PCAE(nn.Module):
         # Affine Transform
         # 128, _, _, 28
         B, _, _, target_size = x.size()
-        # 24个[128, 1, 28, 28]
+        # 24个[128, 1, 28, 28]，用24个姿势将模板转换，得到24个模板。
         transformed_templates = [F.grid_sample(self.templates[i].repeat(B, 1, 1, 1).to(device),
                                                # sce.to(device) could not transfrom self.templates to "cuda"
                                                F.affine_grid(
@@ -68,7 +68,7 @@ class PCAE(nn.Module):
                                  for i in range(self.num_capsules)]
         # [128, 24, 28, 28]
         transformed_templates = torch.cat(transformed_templates, 1)
-        # [128, 24, 28, 28]
+        # [128, 24, 28, 28]，沿着24这个维度softmax
         mix_prob = self.soft_max(d_m * transformed_templates.view(*transformed_templates.size()[:2], -1)).view_as(
             transformed_templates)
         # [128, 1, 28, 28]
